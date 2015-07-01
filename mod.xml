@@ -1,0 +1,16 @@
+<!--
+
+Example context.xml for the Microreading on Demand servlet (JSON15Servelet.java in
+the micro-mod subdirectory)
+
+This goes into Tomcat's directory like /etc/tomcat6/Catalina/localhost/ and
+then Tomcat will go find the WAR file you built by looking at the docBase
+value below.  Whenever you rebuild, Tomcat will detect the change to the WAR
+file and reload it.  Pretty convenient, and administrative privliges are only
+needed to copy this XML file into Tomcat's configuration directory.
+
+-->
+
+<Context docBase="/home/bkisiel/rtw/micro-mod/target/micro-mod.war" reloadable="true">
+
+</Context>
