@@ -22,14 +22,16 @@ import javax.servlet.http.Part;
 import org.apache.commons.io.IOUtils;
 import org.apache.log4j.Logger;
 
-import edu.cmu.ml.rtw.util.files.FileUtility;  // bkdb: can/should we detach from this?
+import edu.cmu.ml.rtw.util.files.FileUtility;  // TODO: can/should we detach from this in order to eliminate dependency on OntologyLearner svn?
 
 import edu.cmu.ml.rtw.generic.data.DataTools;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.AnnotationTypeNLP;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.DocumentNLP;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.DocumentNLPInMemory;
-import edu.cmu.ml.rtw.generic.data.annotation.nlp.DocumentSetNLP;
+import edu.cmu.ml.rtw.generic.data.annotation.nlp.DocumentNLPMutable;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.Language;
+import edu.cmu.ml.rtw.generic.data.annotation.nlp.SerializerDocumentNLPHTML;
+import edu.cmu.ml.rtw.generic.data.annotation.nlp.SerializerDocumentNLPMicro;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.micro.Annotation;
 import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLP;
 import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLPStanford;
@@ -65,12 +67,8 @@ public class JSON2015Servlet extends HttpServlet {
 
     public void init() {
         List<PipelineNLPMicro.Annotator> disabled = new ArrayList<PipelineNLPMicro.Annotator>();
-        /*
-        disabled.add(PipelineNLPMicro.Annotator.SEMANTIC_PARSER); //bkdb
-        disabled.add(PipelineNLPMicro.Annotator.VERB_ANNOTATOR); //bkdb
-        disabled.add(PipelineNLPMicro.Annotator.PPA_DISAMBIGUATOR); //bkdb
-        */
-        microPipeline = new PipelineNLPMicro(0.9, null);
+        //disabled.add(PipelineNLPMicro.Annotator.HDP_PARSER);
+        microPipeline = new PipelineNLPMicro(0.9, disabled);
         log.info("PipelineNLPMicro instantiated");
         stanfordPipeline = new PipelineNLPStanford(maxAnnotationSentenceLength);
 
@@ -161,16 +159,18 @@ public class JSON2015Servlet extends HttpServlet {
     /**
      * The core of the "plaindoc" action, suitable for invoking outside of Tomcat.
      */
-    protected DocumentNLP handlePlainDocCore(String plaintext, DataTools dataTools) {
+    protected DocumentNLPMutable handlePlainDocCore(String plaintext, DataTools dataTools) {
         try {
             PipelineNLPStanford threadStanfordPipeline = new PipelineNLPStanford(stanfordPipeline);
             PipelineNLPMicro threadMicroPipeline = new PipelineNLPMicro(microPipeline);
             PipelineNLP pipeline = threadStanfordPipeline.weld(threadMicroPipeline);
 
-            DocumentNLP document = new DocumentNLPInMemory(dataTools,
-                    "Temporary Document", plaintext, Language.English, pipeline, null, true);
+            DocumentNLPMutable document = new DocumentNLPInMemory(dataTools,
+                    "Temporary Document", plaintext);
+            pipeline.run(document);
             return document;
         } catch (Exception e) {
+            log.error("Caught exception in handlePlainDocCore", e);
             throw new RuntimeException("handlePlainDocCore(\"" + plaintext + "\")", e);
         }
     }
@@ -185,16 +185,14 @@ public class JSON2015Servlet extends HttpServlet {
         // request.  Either way, we'll log it and return it.
         String rawJSON;
         try {
-            DocumentNLP document = handlePlainDocCore(plaintext, new MicroDataTools());
-            List<Annotation> annotations = document.toMicroAnnotation().getAllAnnotations();
-            StringBuffer sb = new StringBuffer();
-            for (Annotation annotation : annotations)
-                sb.append(annotation.toJsonString() + "\n");
-            rawJSON = sb.toString();
-            sb = null;
+            MicroDataTools dataTools = new MicroDataTools();
+            DocumentNLPMutable document = handlePlainDocCore(plaintext, dataTools);
+            SerializerDocumentNLPMicro microSerial = new SerializerDocumentNLPMicro(dataTools);
+            rawJSON = microSerial.serializeToString(document);
         } catch (Exception e) {
             // It's handy to also log errors.  This subsumes the exception handler in our caller,
             // but we'll live with it for now.
+            log.error("Caught exception in handlePlainDocJSON", e);
             rawJSON = e.getMessage();
         }
         return rawJSON;
@@ -210,11 +208,13 @@ public class JSON2015Servlet extends HttpServlet {
         String rawHTML;
         try {
             MicroDataTools dataTools = new MicroDataTools();
-            DocumentNLP document = handlePlainDocCore(plaintext, dataTools);
-            rawHTML = document.toHtmlString(dataTools.getNellAnnotationTypesNLP());
+            DocumentNLPMutable document = handlePlainDocCore(plaintext, dataTools);
+            SerializerDocumentNLPHTML htmlSerial = new SerializerDocumentNLPHTML(dataTools);
+            rawHTML = htmlSerial.serializeToString(document);
         } catch (Exception e) {
             // It's handy to also log errors.  This subsumes the exception handler in our caller,
             // but we'll live with it for now.
+            log.error("Caught exception in handlePlainDocHTML", e);
             rawHTML = e.getMessage();
         }
         return rawHTML;

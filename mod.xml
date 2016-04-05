@@ -11,6 +11,6 @@ needed to copy this XML file into Tomcat's configuration directory.
 
 -->
 
-<Context docBase="/home/bkisiel/rtw/micro-mod/target/micro-mod.war" reloadable="true">
+<Context docBase="/home/bkisiel/rtw/micro-mod/target/micro-mod.war" reloadable="false">
 
 </Context>
