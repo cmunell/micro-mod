@@ -193,7 +193,7 @@ public class JSON2015Servlet extends HttpServlet {
             // It's handy to also log errors.  This subsumes the exception handler in our caller,
             // but we'll live with it for now.
             log.error("Caught exception in handlePlainDocJSON", e);
-            rawJSON = e.getMessage();
+	    throw new RuntimeException("Caught Exception", e);
         }
         return rawJSON;
     }
@@ -215,7 +215,7 @@ public class JSON2015Servlet extends HttpServlet {
             // It's handy to also log errors.  This subsumes the exception handler in our caller,
             // but we'll live with it for now.
             log.error("Caught exception in handlePlainDocHTML", e);
-            rawHTML = e.getMessage();
+	    throw new RuntimeException("Caught Exception", e);
         }
         return rawHTML;
     }
@@ -271,6 +271,9 @@ public class JSON2015Servlet extends HttpServlet {
             // it to the logs.
             log.error("Sending back error", e);
             out.println(e.getMessage());
+	    System.out.println(e.getMessage());
+	    e.printStackTrace();
+	    throw new RuntimeException(e);
         }
     }
 
