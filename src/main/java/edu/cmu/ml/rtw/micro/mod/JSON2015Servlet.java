@@ -37,6 +37,7 @@ import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLP;
 import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLPStanford;
 import edu.cmu.ml.rtw.generic.util.OutputWriter;
 import edu.cmu.ml.rtw.generic.util.ThreadMapper;
+import edu.cmu.ml.rtw.micro.cat.data.annotation.nlp.NELLMentionCategorizer;
 import edu.cmu.ml.rtw.micro.data.MicroDataTools;
 import edu.cmu.ml.rtw.micro.model.annotation.nlp.PipelineNLPMicro;
 
@@ -61,20 +62,20 @@ public class JSON2015Servlet extends HttpServlet {
     protected static Object responseLogMutex = new Object();
 
     protected PipelineNLPMicro microPipeline;
-    protected PipelineNLPStanford stanfordPipeline;
+    ThreadLocal<PipelineNLPStanford> stanfordPipeline = null;  // TODO: Make PipelienNLPStanford thread-safe 
 
     private static int maxAnnotationSentenceLength; 
 
     public void init() {
-        List<PipelineNLPMicro.Annotator> disabled = new ArrayList<PipelineNLPMicro.Annotator>();
-        //disabled.add(PipelineNLPMicro.Annotator.HDP_PARSER);
-        microPipeline = new PipelineNLPMicro(0.9, disabled);
-        log.info("PipelineNLPMicro instantiated");
-        stanfordPipeline = new PipelineNLPStanford(maxAnnotationSentenceLength);
-
+        maxAnnotationSentenceLength = 30;
         // responseLog = properties.getProperty("responseLog", null);
         responseLog = "/nell/results/ongoing-output/MoD-JSON2015Servlet.log";
-        maxAnnotationSentenceLength = 30;
+
+	System.out.println("JSON2015Servelet: Initializing PipelineNLPMicro...");
+        List<PipelineNLPMicro.Annotator> disabled = new ArrayList<PipelineNLPMicro.Annotator>();
+	// disabled.add(PipelineNLPMicro.Annotator.HDP_PARSER);  // Temporary workaround for libsvo troubles
+        microPipeline = new PipelineNLPMicro(NELLMentionCategorizer.DEFAULT_MENTION_MODEL_THRESHOLD, disabled);
+        log.info("PipelineNLPMicro instantiated");
     }
 
     /**
@@ -161,9 +162,15 @@ public class JSON2015Servlet extends HttpServlet {
      */
     protected DocumentNLPMutable handlePlainDocCore(String plaintext, DataTools dataTools) {
         try {
-            PipelineNLPStanford threadStanfordPipeline = new PipelineNLPStanford(stanfordPipeline);
+	    stanfordPipeline = new ThreadLocal() {                                                                     
+		    protected synchronized Object initialValue() { 
+			PipelineNLPStanford p = new PipelineNLPStanford(maxAnnotationSentenceLength); 
+			p.initialize(); 
+			return p;                                                                                      
+		    } 
+		};                                                                                                     
             PipelineNLPMicro threadMicroPipeline = new PipelineNLPMicro(microPipeline);
-            PipelineNLP pipeline = threadStanfordPipeline.weld(threadMicroPipeline);
+            PipelineNLP pipeline = stanfordPipeline.get().weld(threadMicroPipeline);
 
             DocumentNLPMutable document = new DocumentNLPInMemory(dataTools,
                     "Temporary Document", plaintext);
