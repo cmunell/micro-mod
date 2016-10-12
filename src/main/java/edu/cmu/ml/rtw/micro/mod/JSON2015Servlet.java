@@ -35,6 +35,7 @@ import edu.cmu.ml.rtw.generic.data.annotation.nlp.SerializerDocumentNLPMicro;
 import edu.cmu.ml.rtw.generic.data.annotation.nlp.micro.Annotation;
 import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLP;
 import edu.cmu.ml.rtw.generic.model.annotator.nlp.PipelineNLPStanford;
+import edu.cmu.ml.rtw.generic.util.FileUtil;
 import edu.cmu.ml.rtw.generic.util.OutputWriter;
 import edu.cmu.ml.rtw.generic.util.ThreadMapper;
 import edu.cmu.ml.rtw.micro.cat.data.annotation.nlp.NELLMentionCategorizer;
@@ -243,6 +244,19 @@ public class JSON2015Servlet extends HttpServlet {
         String response;
         String format = req.getParameter("format");
         if (format != null && format.equals("demo")) {
+	    // For the demo mode, it's possible for the highlighting
+	    // of the annotations to be misaligned with the text shown
+	    // to the user when the text has content that is
+	    // intepreted differently as HTML than as plain text.  The
+	    // most common sort of thing to happen is whitespace of
+	    // more than one character, which then gets rendered in
+	    // the browser as a single space character, thereby
+	    // throwing the character offsets askew.  So we perform a
+	    // few mutations here to avoid the most common pitfalls.
+	    // It's not perfect, but should be "good enough" for
+	    // general demos and such.
+	    plaintext = plaintext.replaceAll("\\s+", " ");
+
             response = handlePlainDocHTML(plaintext);
         } else {
             // Default to plain JSON, silently ignoring unrecognized format values.
@@ -304,7 +318,11 @@ public class JSON2015Servlet extends HttpServlet {
             me.init();
             log.info("Initialization done");
             log.info("Invoking the plaindoc action for document " + args[0]);
-            System.out.println(me.handlePlainDocCore(args[0], new MicroDataTools()));
+	    if (true) {
+		System.out.println(me.handlePlainDocHTML(FileUtil.readFile(args[0])));
+	    } else {
+		System.out.println(me.handlePlainDocCore(args[0], new MicroDataTools()));
+	    }
             log.info("Success!");
         } catch (Exception e) {
             log.fatal("Uncaught exception", e);
